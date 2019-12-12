@@ -6,11 +6,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"io/ioutil"
 	"log"
-	"os"
-	"os/user"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/btcsuite/btcutil"
@@ -23,17 +19,13 @@ import (
 
 var (
 	// defaultNetwork is the default network
-	defaultNetwork = configDefaultLndNet()
-	// defaultPort is the default lnd port (10009)
-	defaultPort = configDefaultLndPort()
+	defaultNetwork = "testnet"
+	// defaultPort is the default lnd port
+	defaultPort = 10009
 	// defaultRPCHostPort is the default host port of lnd
 	defaultRPCHostPort = fmt.Sprintf("localhost:%d", defaultPort)
-	// defaultTLSCertFileName is the default filename of the tls certificate
-	defaultTLSCertFileName = "tls.cert"
 	// defaultLndDir is the default location of .lnd
-	defaultLndDir = configDefaultLndDir()
-	// lndNetwork is the default LND network (testnet)
-	lndNetwork = configDefaultLndNet()
+	defaultLndDir = btcutil.AppDataDir("lnd", false)
 	// defaultTLSCertPath is the default location of tls.cert
 	defaultTLSCertPath = filepath.Join(defaultLndDir, "tls.cert")
 	// defaultMacaroonPath is the default dir of x.macaroon
@@ -60,63 +52,6 @@ type LightningConfig struct {
 	RPCServer    string
 }
 
-// cleanAndExpandPath expands environment variables and leading ~ in the
-// passed path, cleans the result, and returns it.
-// This function is taken from https://github.com/btcsuite/btcd
-func cleanAndExpandPath(path string) string {
-	if path == "" {
-		return ""
-	}
-
-	// Expand initial ~ to OS specific home directory.
-	if strings.HasPrefix(path, "~") {
-		var homeDir string
-		user, err := user.Current()
-		if err == nil {
-			homeDir = user.HomeDir
-		} else {
-			homeDir = os.Getenv("HOME")
-		}
-
-		path = strings.Replace(path, "~", homeDir, 1)
-	}
-
-	// NOTE: The os.ExpandEnv doesn't work with Windows-style %VARIABLE%,
-	// but the variables can still be expanded via POSIX-style $VARIABLE.
-	return filepath.Clean(os.ExpandEnv(path))
-}
-
-func configDefaultLndDir() string {
-	if len(os.Getenv("LND_DIR")) != 0 {
-		return os.Getenv("LND_DIR")
-	}
-	return btcutil.AppDataDir("lnd", false)
-}
-
-func configDefaultLndNet() string {
-	if env := os.Getenv("LND_NETWORK"); env != "" {
-		switch env {
-		case "mainnet", "testnet", "regtest", "simnet":
-			return env
-		default:
-			log.Fatalf("Environment variable LND_NETWORK is not a valid network: %s", env)
-		}
-	}
-	return "testnet"
-}
-
-func configDefaultLndPort() int {
-	env := os.Getenv("LND_PORT")
-	if len(env) != 0 {
-		port, err := strconv.Atoi(env)
-		if err != nil {
-			log.Fatalf("Environment variable LND_PORT is not a valid int: %s", env)
-		}
-		return port
-	}
-	return 10009
-}
-
 // NewLNDClient opens a new connection to LND and returns the client
 func NewLNDClient(options LightningConfig) (
 	lnrpc.LightningClient, error) {
@@ -129,7 +64,7 @@ func NewLNDClient(options LightningConfig) (
 	}
 	if cfg.LndDir != options.LndDir && options.LndDir != "" {
 		cfg.LndDir = options.LndDir
-		cfg.TLSCertPath = filepath.Join(cfg.LndDir, defaultTLSCertFileName)
+		cfg.TLSCertPath = filepath.Join(cfg.LndDir, "tls.cert")
 		cfg.MacaroonPath = filepath.Join(cfg.LndDir,
 			filepath.Join("data/chain/bitcoin",
 				filepath.Join(cfg.Network, "admin.macaroon")))
@@ -143,6 +78,8 @@ func NewLNDClient(options LightningConfig) (
 	if cfg.RPCServer != options.RPCServer && options.RPCServer != "" {
 		cfg.RPCServer = options.RPCServer
 	}
+
+	fmt.Printf("opening lnd connection with config: %+v\n", cfg)
 
 	tlsCreds, err := credentials.NewClientTLSFromFile(cfg.TLSCertPath, "")
 	if err != nil {
@@ -168,8 +105,7 @@ func NewLNDClient(options LightningConfig) (
 		grpc.WithPerRPCCredentials(macaroons.NewMacaroonCredential(mac)),
 	}
 
-	backgroundContext := context.Background()
-	withTimeout, cancel := context.WithTimeout(backgroundContext, 5*time.Second)
+	withTimeout, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	conn, err := grpc.DialContext(withTimeout, cfg.RPCServer, opts...)
