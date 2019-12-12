@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"io/ioutil"
-	"log"
 	"path/filepath"
 	"time"
 
@@ -79,8 +78,6 @@ func NewLNDClient(options LightningConfig) (
 		cfg.RPCServer = options.RPCServer
 	}
 
-	fmt.Printf("opening lnd connection with config: %+v\n", cfg)
-
 	tlsCreds, err := credentials.NewClientTLSFromFile(cfg.TLSCertPath, "")
 	if err != nil {
 		err = errors.Wrap(err, "Cannot get node tls credentials")
@@ -110,12 +107,9 @@ func NewLNDClient(options LightningConfig) (
 
 	conn, err := grpc.DialContext(withTimeout, cfg.RPCServer, opts...)
 	if err != nil {
-		err = errors.Wrap(err, "cannot dial to lnd")
-		return nil, err
+		return nil, fmt.Errorf("cannot dial to lnd with config: %+v: %w", cfg, err)
 	}
 	client := lnrpc.NewLightningClient(conn)
-
-	log.Printf("opened connection to lnd on %s", cfg.RPCServer)
 
 	return client, nil
 }
