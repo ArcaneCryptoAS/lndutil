@@ -3,6 +3,7 @@ package lndutil
 import (
 	"context"
 	"fmt"
+	"github.com/lightningnetwork/lnd/lnrpc"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/breez/lnd/lnrpc"
 	"github.com/btcsuite/btcutil"
 	"github.com/lightningnetwork/lnd/macaroons"
 	"github.com/pkg/errors"
@@ -22,31 +22,31 @@ import (
 )
 
 var (
-	// DefaultNetwork is the default network
-	DefaultNetwork = configDefaultLndNet()
-	// DefaultPort is the default lnd port (10009)
-	DefaultPort = configDefaultLndPort()
-	// DefaultRPCHostPort is the default host port of lnd
-	DefaultRPCHostPort = fmt.Sprintf("localhost:%d", DefaultPort)
-	// DefaultTLSCertFileName is the default filename of the tls certificate
-	DefaultTLSCertFileName = "tls.cert"
-	// DefaultLndDir is the default location of .lnd
-	DefaultLndDir = configDefaultLndDir()
-	// LndNetwork is the default LND network (testnet)
-	LndNetwork = configDefaultLndNet()
-	// DefaultTLSCertPath is the default location of tls.cert
-	DefaultTLSCertPath = filepath.Join(DefaultLndDir, "tls.cert")
-	// DefaultMacaroonPath is the default dir of x.macaroon
-	DefaultMacaroonPath = filepath.Join(DefaultLndDir, "data", "chain",
-		"bitcoin", DefaultNetwork, "admin.macaroon")
+	// defaultNetwork is the default network
+	defaultNetwork = configDefaultLndNet()
+	// defaultPort is the default lnd port (10009)
+	defaultPort = configDefaultLndPort()
+	// defaultRPCHostPort is the default host port of lnd
+	defaultRPCHostPort = fmt.Sprintf("localhost:%d", defaultPort)
+	// defaultTLSCertFileName is the default filename of the tls certificate
+	defaultTLSCertFileName = "tls.cert"
+	// defaultLndDir is the default location of .lnd
+	defaultLndDir = configDefaultLndDir()
+	// lndNetwork is the default LND network (testnet)
+	lndNetwork = configDefaultLndNet()
+	// defaultTLSCertPath is the default location of tls.cert
+	defaultTLSCertPath = filepath.Join(defaultLndDir, "tls.cert")
+	// defaultMacaroonPath is the default dir of x.macaroon
+	defaultMacaroonPath = filepath.Join(defaultLndDir, "data", "chain",
+		"bitcoin", defaultNetwork, "admin.macaroon")
 
-	// DefaultCfg is a config interface with default values
-	DefaultCfg = LightningConfig{
-		LndDir:       DefaultLndDir,
-		TLSCertPath:  DefaultTLSCertPath,
-		MacaroonPath: DefaultMacaroonPath,
-		Network:      DefaultNetwork,
-		RPCServer:    DefaultRPCHostPort,
+	// defaultCfg is a config interface with default values
+	defaultCfg = LightningConfig{
+		LndDir:       defaultLndDir,
+		TLSCertPath:  defaultTLSCertPath,
+		MacaroonPath: defaultMacaroonPath,
+		Network:      defaultNetwork,
+		RPCServer:    defaultRPCHostPort,
 	}
 )
 
@@ -120,20 +120,28 @@ func configDefaultLndPort() int {
 // NewLNDClient opens a new connection to LND and returns the client
 func NewLNDClient(options LightningConfig) (
 	lnrpc.LightningClient, error) {
-	cfg := LightningConfig{
-		LndDir:       options.LndDir,
-		TLSCertPath:  cleanAndExpandPath(options.TLSCertPath),
-		MacaroonPath: cleanAndExpandPath(options.MacaroonPath),
-		Network:      options.Network,
-		RPCServer:    options.RPCServer,
-	}
+	cfg := defaultCfg
 
-	if options.LndDir != DefaultLndDir {
+	// check for empty string in case it is just initialized to
+	// the empty struct value
+	if cfg.Network != options.Network && options.Network != "" {
+		cfg.Network = options.Network
+	}
+	if cfg.LndDir != options.LndDir && options.LndDir != "" {
 		cfg.LndDir = options.LndDir
-		cfg.TLSCertPath = filepath.Join(cfg.LndDir, DefaultTLSCertFileName)
+		cfg.TLSCertPath = filepath.Join(cfg.LndDir, defaultTLSCertFileName)
 		cfg.MacaroonPath = filepath.Join(cfg.LndDir,
 			filepath.Join("data/chain/bitcoin",
 				filepath.Join(cfg.Network, "admin.macaroon")))
+	}
+	if cfg.MacaroonPath != options.MacaroonPath && options.MacaroonPath != "" {
+		cfg.MacaroonPath = options.MacaroonPath
+	}
+	if cfg.TLSCertPath != options.TLSCertPath && options.TLSCertPath != "" {
+		cfg.TLSCertPath = options.TLSCertPath
+	}
+	if cfg.RPCServer != options.RPCServer && options.RPCServer != "" {
+		cfg.RPCServer = options.RPCServer
 	}
 
 	tlsCreds, err := credentials.NewClientTLSFromFile(cfg.TLSCertPath, "")
