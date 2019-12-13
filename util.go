@@ -10,7 +10,6 @@ import (
 
 	"github.com/btcsuite/btcutil"
 	"github.com/lightningnetwork/lnd/macaroons"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"gopkg.in/macaroon.v2"
@@ -80,20 +79,17 @@ func NewLNDClient(options LightningConfig) (
 
 	tlsCreds, err := credentials.NewClientTLSFromFile(cfg.TLSCertPath, "")
 	if err != nil {
-		err = errors.Wrap(err, "Cannot get node tls credentials")
-		return nil, err
+		return nil, fmt.Errorf("could not create new tls credentials: %w", err)
 	}
 
 	macaroonBytes, err := ioutil.ReadFile(cfg.MacaroonPath)
 	if err != nil {
-		err = errors.Wrap(err, "Cannot read macaroon file")
-		return nil, err
+		return nil, fmt.Errorf("could not read macaroon file: %w", err)
 	}
 
 	mac := &macaroon.Macaroon{}
 	if err = mac.UnmarshalBinary(macaroonBytes); err != nil {
-		err = errors.Wrap(err, "Cannot unmarshal macaroon")
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal macaroon: %w", err)
 	}
 
 	opts := []grpc.DialOption{
