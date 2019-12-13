@@ -59,6 +59,8 @@ func NewLNDClient(options LightningConfig) (
 	// the empty struct value
 	if cfg.Network != options.Network && options.Network != "" {
 		cfg.Network = options.Network
+		// force lnddir to be recomputed by setting it to different value
+		cfg.LndDir = "tmp"
 	}
 	if cfg.LndDir != options.LndDir && options.LndDir != "" {
 		cfg.LndDir = options.LndDir
