@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"io/ioutil"
+	"os"
+	"os/user"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcutil"
