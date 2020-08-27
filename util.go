@@ -3,7 +3,6 @@ package lndutil
 import (
 	"context"
 	"fmt"
-	"github.com/lightningnetwork/lnd/lnrpc"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/macaroons"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -20,7 +20,7 @@ import (
 
 var (
 	// defaultNetwork is the default network
-	defaultNetwork = "testnet"
+	defaultNetwork = "regtest"
 	// defaultPort is the default lnd port
 	defaultPort = 10009
 	// defaultRPCHostPort is the default host port of lnd
@@ -139,4 +139,43 @@ func CleanAndExpandPath(path string) string {
 	return filepath.Clean(os.ExpandEnv(path))
 }
 
+// ConnectToLnd connects to lnd-host using a tls.cert, admin.macaroon, and an net-address
+func ConnectToLND(lndDir, lndHost, network string) (lnrpc.LightningClient, error) {
+	tlsPath := CleanAndExpandPath(fmt.Sprintf("%s/tls.cert", lndDir))
+	macaroonPath := CleanAndExpandPath(fmt.Sprintf("%s/data/chain/bitcoin/%s/admin.macaroon", lndDir, network))
 
+	tlsCreds, err := credentials.NewClientTLSFromFile(tlsPath, "")
+	if err != nil {
+		return nil, fmt.Errorf("could not extract tls cert: %w", err)
+
+	}
+
+	macaroonBytes, err := ioutil.ReadFile(macaroonPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not extract macaroon: %w", err)
+
+	}
+
+	mac := &macaroon.Macaroon{}
+	if err = mac.UnmarshalBinary(macaroonBytes); err != nil {
+		return nil, fmt.Errorf("could not unmarshal macaroonBytes: %w", err)
+
+	}
+
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(tlsCreds),
+		grpc.WithBlock(),
+		grpc.WithPerRPCCredentials(macaroons.NewMacaroonCredential(mac)),
+	}
+	ctx := context.Background()
+	withTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(withTimeout, lndHost, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("could not dial lnd: %w", err)
+	}
+
+	return lnrpc.NewLightningClient(conn), nil
+
+}
