@@ -1,4 +1,4 @@
-module github.com/ArcaneCryptoAS/lndutil
+module github.com/arcanetechnology/lndutil
 
 go 1.13
 
